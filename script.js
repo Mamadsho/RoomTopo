@@ -1,34 +1,62 @@
-import { initVoronoi, updateVoronoi } from './webglVoronoi.js';
+import * as gl from './webglVoronoi.js';
+import * as sv from './svgVoronoi.js';
+import * as ht from './htmlVoronoi.js';
+import { hexToRgb } from './utils.js';
 
-document.querySelector('h1').textContent = 'Hello, Universe!';
+document.addEventListener('DOMContentLoaded', () => {
 
-// 8 Voronoi sites
-const sites = [
-    [-0.3,  0.2],
-    [ 0.1, -0.1],
-    [ 0.4,  0.3],
-    [-0.9, -0.4],
-    [ 0.0,  0.5],
-    [ 0.7, -0.3],
-];
-
-// Add colors for each site
-const colors = [
-    [1.0, 0.0, 0.0], // red
-    [0.0, 1.0, 0.0], // green
-    [0.0, 0.0, 1.0], // blue
-    [1.0, 1.0, 0.0], // yellow
-    [1.0, 0.0, 1.0], // magenta
-    [0.0, 1.0, 1.0], // cyan
-    [0.5, 0.5, 0.5], // gray
-    [1.0, 0.5, 0.0]  // orange
-];
+const sites = [];
+const colors = [];
 
 // canvas setup
 const canvas = document.getElementById('canvas');
-
+const svg = document.getElementById('voronoi-sites-svg');
+const rooms_container = document.getElementById('rooms-container');
 // Initialize Voronoi rendering
-initVoronoi(canvas, sites, colors);
+gl.init(canvas);
+sv.initSVG(canvas, sites, ()=>{
+    gl.update(sites, colors);
+});
 
-// Example: update Voronoi later (call this when you want to update)
-// updateVoronoi(newSites, newColors);
+class Room{
+    name;
+    svg;
+    dom;
+
+    constructor(name){
+        this.name = name;
+        this.dom = ht.addRoom(name);
+        colors.push(hexToRgb(this.dom.colorInput.value));
+        sites.push([0.0, 0.0]);
+
+        this.svg = sv.addRoom("Room", canvas.width / 2, canvas.height / 2);
+        gl.update(sites, colors);
+
+        this.dom.colorInput.addEventListener('input',()=>{
+            colors[this.getId()] = hexToRgb(this.dom.colorInput.value);
+            gl.update(sites, colors);
+        });
+
+        this.dom.delBtn.addEventListener('click', ()=>{
+            let id = this.getId();
+            sites.splice(this.getId(), 1);
+            colors.splice(this.getId(), 1);
+            sv.removeRoom(this.getId());
+            gl.update(sites, colors);
+            this.dom.remove();
+        });
+    }
+
+    getId(){
+        return Array.from(rooms_container.children).indexOf(this.dom);
+    }
+}
+
+const r1 = new Room("Комната 1");
+
+const addRoomBtn = document.querySelector('#add-room-button');
+addRoomBtn.addEventListener('click', () => {
+    new Room("Комната " + (sites.length + 1));
+});
+
+});

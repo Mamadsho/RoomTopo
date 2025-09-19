@@ -5,3 +5,17 @@ html{
     padding: 20px;
     background-color: #f0f0f0;
 }
+button, input {
+    font-size: large;
+    font-family: monospace;
+    height: 35px;
+    margin: 0px;
+}
+button, input[type="text"] {
+    padding: 5px;
+}
+
+.room {
+    display: flex;
+    margin-bottom: 5px;
+}
