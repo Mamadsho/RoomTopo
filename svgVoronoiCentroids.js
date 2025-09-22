@@ -1,9 +1,10 @@
 let svg;
 let width;
 let height;
+import {clamp} from './utils.js'
 
 export function initSVG(canvas, sites, onUpdate) {
-    svg = document.getElementById('voronoi-sites-svg');
+    svg = document.getElementById('voronoi-centroids-svg');
     width = canvas.width;
     height = canvas.height;
 
@@ -25,14 +26,27 @@ export function addRoom(name, cx, cy) {
     // Map normalized coordinates to pixel positions
     // site: [x, y], both in [-1, 1]
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('cx', cx);
-    circle.setAttribute('cy', cy);
-    circle.setAttribute('r', Math.max(8, width * 0.01));
+    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    circle.setAttribute('cx', 0);
+    circle.setAttribute('cy', 0);
+    circle.setAttribute('r', .05);
     circle.setAttribute('fill', '#fff0');
     circle.setAttribute('stroke', 'white');
-    circle.setAttribute('stroke-width', '2');
-    svg.appendChild(circle);
-    return circle;
+    circle.setAttribute('stroke-width', '.015');
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', 0);
+    label.setAttribute('y', 0.15);
+    label.setAttribute('class', 'map-label');
+    label.textContent = name;
+    group.appendChild(circle);
+    group.appendChild(label);
+    svg.appendChild(group);
+    return group;
+}
+
+export function updateRoomLabel(room, name){
+    const label = room.querySelector('text');
+    label.textContent = name;
 }
 
 export function removeRoom(idx){
@@ -45,29 +59,39 @@ function enableSiteDragging(canvas, sites, onUpdate) {
     
     svg.addEventListener('mousedown', (e) => {
         if (e.target.tagName !== 'circle') return;
-        draggingIdx = Array.from(svg.children).indexOf(e.target);
+        draggingIdx = Array.from(svg.children).indexOf(e.target.parentElement);
         if (draggingIdx === -1) return;
         e.preventDefault();
     });
 
-    window.addEventListener('mousemove', (e) => {
-        if (draggingIdx === null) return;
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+    function onDrag( ax, ay ){
         const width = canvas.width;
         const height = canvas.height;
         // Convert pixel to normalized coordinates [-1, 1]
-        sites[draggingIdx][0] = (x / width) * 2 - 1;
-        sites[draggingIdx][1] = -((y / height) * 2 - 1);
+        const rx = 2 * ax / width - 1.0;
+        const ry = 2 * ay / height - 1.0;
+        const x = clamp(rx, -1, 1);
+        const y = clamp(ry, -1, 1);
 
-        // Move the SVG circle only
+        sites[draggingIdx][0] = x;
+        sites[draggingIdx][1] = -y;
+
+        // Move the SVG dot group only
         const circle = svg.children[draggingIdx];
-        circle.setAttribute('cx', x);
-        circle.setAttribute('cy', y);
+        circle.setAttribute('transform', `translate(${x}, ${y})`);
 
         if (onUpdate) onUpdate();
+    }
+
+    window.addEventListener('mousemove', (e) => {
+        if (draggingIdx === null) return;
+        const rect = canvas.getBoundingClientRect();
+        const ax = e.clientX - rect.left;
+        const ay = e.clientY - rect.top;
+        
+        onDrag( ax, ay );
     });
+    
     
 
     window.addEventListener('mouseup', () => {
@@ -87,17 +111,10 @@ function enableSiteDragging(canvas, sites, onUpdate) {
         if (draggingIdx === null) return;
         const touch = e.touches[0];
         const rect = canvas.getBoundingClientRect();
-        const x = touch.clientX - rect.left;
-        const y = touch.clientY - rect.top;
-        const width = canvas.width;
-        const height = canvas.height;
-        sites[draggingIdx][0] = (x / width) * 2 - 1;
-        sites[draggingIdx][1] = -((y / height) * 2 - 1);
-        updateVoronoi(sites, colors);
-        const circle = svg.children[draggingIdx];
-        circle.setAttribute('cx', x);
-        circle.setAttribute('cy', y);
-        if (onUpdate) onUpdate(sites, colors);
+        const ax = touch.clientX - rect.left;
+        const ay = touch.clientY - rect.top;
+
+        onDrag( ax, ay );
     });
 
     window.addEventListener('touchend', () => {

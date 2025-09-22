@@ -6,3 +6,7 @@ export function hexToRgb(hex) {
     parseInt(hex.substring(4, 6), 16) / 256
   ];
 }
+
+export function clamp(num, min, max) {
+  return Math.min(Math.max(num, min), max);
+}

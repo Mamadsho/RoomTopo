@@ -19,3 +19,12 @@ button, input[type="text"] {
     display: flex;
     margin-bottom: 5px;
 }
+
+.map-label {
+    fill: white;
+    text-anchor: middle;
+    font-size: 0.12;
+    font-family: monospace;
+    pointer-events: none;
+    user-select: none;
+}

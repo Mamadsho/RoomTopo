@@ -1,0 +1,175 @@
+let svg;
+
+export function init(canvas){
+    svg = document.querySelector("#vorinoi-polygons");
+    svg.setAttribute("width", canvas.width);
+    svg.setAttribute("height", canvas.height);
+}
+
+
+export function addLine(p1, p2, stroke=null){
+    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.segment = [p1, p2];
+    if (stroke) l.setAttribute('stroke', stroke);
+    updateLine(l);
+    svg.appendChild(l);
+    return l;
+}
+
+export function updateLine(l){
+    l.setAttribute("x1", l.segment[0][0]);
+    l.setAttribute("y1", -l.segment[0][1]);
+    l.setAttribute("x2", l.segment[1][0]);
+    l.setAttribute("y2", -l.segment[1][1]);
+}
+
+export function addPolygon(pts, stroke=null){
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    p.pts = pts;
+    if (stroke) p.setAttribute('stroke', stroke);
+    updatePolygon(p);
+    svg.appendChild(p);
+    return p;
+}
+
+export function updatePolygon(polygon){
+    let attr = "";
+    polygon.pts.forEach((p)=>{
+        attr += p[0] + "," + -p[1] + " ";
+    });
+    polygon.setAttribute('points', attr);
+}
+
+export function addDot(center){
+    const d = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    d.c = center;
+    d.setAttribute('r', 0.02);
+    updateDot(d);
+    svg.appendChild(d);
+    return d
+}
+
+export function updateDot(d){
+    d.setAttribute('cx', d.c[0]);
+    d.setAttribute('cy', -d.c[1]);
+}
+
+export function isIntersecting(l1, l2){
+    const a = [ [l1[1][0] - l1[0][0]],
+                [l1[1][1] - l1[0][1]] ];
+    const nor = [a[1], -a[0]];
+    const b = [ [l2[0][0] - l1[0][0]],
+                [l2[0][1] - l1[0][1]]];
+    const c = [ [l2[1][0] - l1[0][0]],
+                [l2[1][1] - l1[0][1]]];
+    return dot(nor, b) * dot (nor, c) <= 0;
+}
+
+export function findIntersection(cs1, ls2){
+    const c = [ cs1[1][0] - cs1[0][0],
+                cs1[1][1] - cs1[0][1]];
+
+    const l = [ ls2[1][0] - ls2[0][0],
+                ls2[1][1] - ls2[0][1]];
+    
+    const o = [ cs1[0][0] - ls2[0][0],
+                cs1[0][1] - ls2[0][1]];
+    
+    // k1 * c - k2 * l = o
+    // by Cramer's Rule
+    // k2 = det(c, o)/det(c, -l);
+
+    const k2 = det(c, o)/det(c, l);
+    const iv = [k2 * l[0], k2 * l[1]];
+    const ip = [iv[0] + ls2[0][0], iv[1] + ls2[0][1]];
+    return ip;
+}
+
+export function bisectPolygon(polygon, line){
+    const res = cutPolygon(polygon.pts, line.segment);
+    if (res){
+        addPolygon(res[0], "red");
+        addPolygon(res[1], "blue");
+    }
+    return res;
+}
+
+export function cutPolygon(pts, line, eps = 1e-9) {
+    const n = pts.length;
+
+    // Shift polygon so the line passes through the origin
+    const shifted = pts.map(p => [p[0] - line[0][0], p[1] - line[0][1]]);
+
+    // Normal to the line (perpendicular vector)
+    const normal = [line[1][1] - line[0][1], line[0][0] - line[1][0]];
+
+    // Side test with tolerance
+    const side = (p) => dot(p, normal) > eps;
+
+    let intersections = [];
+    let prevSide = side(shifted[0]);
+
+    // Traverse edges in order to detect crossings
+    for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n;
+        const currSide = side(shifted[j]);
+
+        if (currSide !== prevSide) {
+            intersections.push(i);
+        }
+        prevSide = currSide;
+    }
+
+    // Convex polygon assumption → exactly 2 intersections max
+    if (intersections.length !== 2) {
+        return null;
+    }
+
+    const i0 = intersections[0];
+    const i1 = intersections[1];
+
+    // Find intersection points in original coordinates
+    const C0 = findIntersection(line, [pts[i0], pts[(i0 + 1) % n]]);
+    const C1 = findIntersection(line, [pts[i1], pts[(i1 + 1) % n]]);
+
+    // Since convex & traversal order → i0 < i1 guaranteed
+    const P1 = [
+        ...pts.slice(0, i0 + 1),
+        C0, C1,
+        ...pts.slice(i1 + 1, n)
+    ];
+    const P2 = [
+        C0,
+        ...pts.slice(i0 + 1, i1 + 1),
+        C1
+    ];
+
+    return [P1, P2];
+}
+
+export function pointInPolygon(pt, polygon) {
+    let inside = false;
+    const n = polygon.length;
+    for (let i = 0, j = n - 1; i < n; j = i++) {
+        const xi = polygon[i][0], yi = polygon[i][1];
+        const xj = polygon[j][0], yj = polygon[j][1];
+        const intersect = ((yi > pt[1]) !== (yj > pt[1])) &&
+                            (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+export function midline(p1, p2){
+    const normal = [p2[1] - p1[1], p1[0] - p2[0]];
+    const mid = [(p1[0] + p2[0])/2, (p1[1] + p2[1])/2];
+    return [ [mid[0] - normal[0], mid[1] - normal[1]],
+             [mid[0] + normal[0], mid[1] + normal[1]] ];
+}
+function dot (a, b){
+    return a[0] * b[0] + a[1] * b[1];
+}
+
+function det (a, b){
+    return a[0] * b[1] - a[1] * b[0];
+}

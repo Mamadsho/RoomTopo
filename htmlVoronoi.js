@@ -25,7 +25,7 @@ export function addRoom(name){
     newRoom.idx = Array.from(newRoom.parentNode.children).indexOf(newRoom);
 
     newRoom.delBtn = delBtn;
-    newRoom.textInput = textInput;
+    newRoom.nameInput = textInput;
     newRoom.colorInput = colorInput;
 
     return newRoom;
