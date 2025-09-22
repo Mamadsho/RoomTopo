@@ -20,11 +20,19 @@ button, input[type="text"] {
     margin-bottom: 5px;
 }
 
-.map-label {
+.centroid {
+    r: 0.05;
+    fill: #fff0;
+    stroke: white;
+    stroke-width: 0.015;
+}
+
+.label{
     fill: white;
     text-anchor: middle;
     font-size: 0.12;
     font-family: monospace;
     pointer-events: none;
     user-select: none;
+    transform: translateY(-0.15px);
 }

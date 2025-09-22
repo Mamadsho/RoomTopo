@@ -23,20 +23,11 @@ export function initSVG(canvas, sites, onUpdate) {
 }
 
 export function addRoom(name, cx, cy) {
-    // Map normalized coordinates to pixel positions
-    // site: [x, y], both in [-1, 1]
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    circle.setAttribute('cx', 0);
-    circle.setAttribute('cy', 0);
-    circle.setAttribute('r', .05);
-    circle.setAttribute('fill', '#fff0');
-    circle.setAttribute('stroke', 'white');
-    circle.setAttribute('stroke-width', '.015');
+    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    circle.setAttribute('class', 'centroid');
     const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute('x', 0);
-    label.setAttribute('y', 0.15);
-    label.setAttribute('class', 'map-label');
+    label.setAttribute('class', 'label');
     label.textContent = name;
     group.appendChild(circle);
     group.appendChild(label);

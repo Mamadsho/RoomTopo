@@ -173,3 +173,56 @@ function dot (a, b){
 function det (a, b){
     return a[0] * b[1] - a[1] * b[0];
 }
+
+export function generateVoronoi(sites, bbox) {
+    for (let i = 0; i < sites.length; i++) {
+        // addDot(sites[i]);
+        let pol = bbox;
+        let vpol = addPolygon(pol, "lightgrey");
+        for (let j = 0; j < sites.length; j++) {
+            if (i !== j) {
+                const mid = midline(sites[i], sites[j]);
+                const cut_pol = cutPolygon(pol, mid);
+                if (cut_pol) {
+                    if (pointInPolygon(sites[i], cut_pol[0])) { pol = cut_pol[0]; }
+                    else { pol = cut_pol[1]; }
+                    vpol.pts = pol;
+                    // updatePolygon(vpol);
+                }
+            }
+        }
+        updatePolygon(vpol);
+    }
+}
+
+export function updateVoronoi(sites, bbox) {
+    while (svg.children.length > sites.length) {
+        svg.removeChild(svg.lastChild);
+    }
+    // Add new dots and polygons
+    for (let i = 0; i < sites.length; i++) {
+        if (i >= svg.children.length) {
+            addPolygon(bbox, "lightgrey");
+        }
+    }
+
+    // Update existing dots and polygons
+    // if it has changed
+    for (let i = 0; i < sites.length; i++) {
+        let pol = bbox;
+        for (let j = 0; j < sites.length; j++) {
+            if (i !== j) {
+                const mid = midline(sites[i], sites[j]);
+                const cut_pol = cutPolygon(pol, mid);
+                if (cut_pol) {
+                    if (pointInPolygon(sites[i], cut_pol[0])) { pol = cut_pol[0]; }
+                    else { pol = cut_pol[1]; }
+                }
+            }
+        }
+        if (pol !== svg.children[i].pts) {
+            svg.children[i].pts = pol;
+            updatePolygon(svg.children[i]);
+        }
+    }
+}
