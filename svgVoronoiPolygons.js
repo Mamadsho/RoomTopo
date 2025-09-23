@@ -1,18 +1,22 @@
-let svg;
+let vor_graph;
+let links_graph;
 
 export function init(canvas){
-    svg = document.querySelector("#vorinoi-polygons");
-    svg.setAttribute("width", canvas.width);
-    svg.setAttribute("height", canvas.height);
+    vor_graph = document.querySelector("#vorinoi-polygons");
+    links_graph = document.querySelector("#links-lines");
+    [vor_graph, links_graph].forEach((g)=>{
+        g.setAttribute("width", canvas.width);
+        g.setAttribute("height", canvas.height);
+    });
 }
 
 
-export function addLine(p1, p2, stroke=null){
+export function addLine(p1, p2, stroke=null, container=links_graph){
     const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     l.segment = [p1, p2];
     if (stroke) l.setAttribute('stroke', stroke);
     updateLine(l);
-    svg.appendChild(l);
+    container.appendChild(l);
     return l;
 }
 
@@ -23,12 +27,12 @@ export function updateLine(l){
     l.setAttribute("y2", -l.segment[1][1]);
 }
 
-export function addPolygon(pts, stroke=null){
+export function addPolygon(pts, stroke=null, container=vor_graph){
     const p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     p.pts = pts;
     if (stroke) p.setAttribute('stroke', stroke);
     updatePolygon(p);
-    svg.appendChild(p);
+    container.appendChild(p);
     return p;
 }
 
@@ -40,12 +44,12 @@ export function updatePolygon(polygon){
     polygon.setAttribute('points', attr);
 }
 
-export function addDot(center){
+export function addDot(center, container=vor_graph){
     const d = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     d.c = center;
     d.setAttribute('r', 0.02);
     updateDot(d);
-    svg.appendChild(d);
+    container.appendChild(d);
     return d
 }
 
@@ -160,6 +164,17 @@ export function pointInPolygon(pt, polygon) {
     return inside;
 }
 
+export function polygonArea(pts){
+    let area = 0;
+    const n = pts.length;
+    for (let i = 0; i < n; i++){
+        const j = (i + 1) % n;
+        area += pts[i][0] * pts[j][1];
+        area -= pts[j][0] * pts[i][1];
+    }
+    return area / 2;
+}
+
 export function midline(p1, p2){
     const normal = [p2[1] - p1[1], p1[0] - p2[0]];
     const mid = [(p1[0] + p2[0])/2, (p1[1] + p2[1])/2];
@@ -196,12 +211,12 @@ export function generateVoronoi(sites, bbox) {
 }
 
 export function updateVoronoi(sites, bbox) {
-    while (svg.children.length > sites.length) {
-        svg.removeChild(svg.lastChild);
+    while (vor_graph.children.length > sites.length) {
+        vor_graph.removeChild(vor_graph.lastChild);
     }
     // Add new dots and polygons
     for (let i = 0; i < sites.length; i++) {
-        if (i >= svg.children.length) {
+        if (i >= vor_graph.children.length) {
             addPolygon(bbox, "lightgrey");
         }
     }
@@ -220,9 +235,9 @@ export function updateVoronoi(sites, bbox) {
                 }
             }
         }
-        if (pol !== svg.children[i].pts) {
-            svg.children[i].pts = pol;
-            updatePolygon(svg.children[i]);
+        if (pol !== vor_graph.children[i].pts) {
+            vor_graph.children[i].pts = pol;
+            updatePolygon(vor_graph.children[i]);
         }
     }
 }

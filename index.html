@@ -5,21 +5,24 @@
     <title>Document</title>
     <link rel="stylesheet" href="styles.css">
     <script type="module" src="script.js" defer></script>
-
 </head>
 <body>
     <h1>Топомощь</h1>
     <!-- <p></p> -->
-    <!-- Canvas -->
     <div>
         <canvas id="canvas" width="300" height="300"></canvas>
         <svg id="voronoi-centroids-svg" style="position: absolute; left: 0; top: 0;" viewbox="-1 -1 2 2"></svg>
         <svg id="vorinoi-polygons" style="position: absolute; left: 0; top: 0;" viewbox="-1 -1 2 2" fill="none"
+            stroke="black" stroke-width=".02"></svg>
+        <svg id="links-lines" style="position: absolute; left: 0; top: 0;" viewbox="-1 -1 2 2" fill="none"
             stroke="black" stroke-width=".02"></svg>
     </div>
     
     <h3>Комнаты:</h3>
     <div id="rooms-container"></div>
     <button id="add-room-button">Добавить комнату</button>
+    <h3>Связи:</h3>
+    <div id="links-container"></div>
+    <button id="add-link-button">Добавить связь</button>
 </body>
 </html>

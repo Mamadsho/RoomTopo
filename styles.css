@@ -5,7 +5,7 @@ html{
     padding: 20px;
     background-color: #f0f0f0;
 }
-button, input {
+button, input, select {
     font-size: large;
     font-family: monospace;
     height: 35px;
@@ -14,10 +14,14 @@ button, input {
 button, input[type="text"] {
     padding: 5px;
 }
+select{
+    width: 130px;
+}
 
-.room {
+.room, .link {
     display: flex;
     margin-bottom: 5px;
+    align-items: center;
 }
 
 .centroid {
@@ -35,4 +39,10 @@ button, input[type="text"] {
     pointer-events: none;
     user-select: none;
     transform: translateY(-0.15px);
+}
+
+#links-lines line{
+    stroke: #ffffff52;
+    stroke-width: 0.05;
+    stroke-linecap: round;
 }

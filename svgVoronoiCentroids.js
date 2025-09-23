@@ -93,7 +93,7 @@ function enableSiteDragging(canvas, sites, onUpdate) {
         const touch = e.touches[0];
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
         if (target && target.tagName === 'circle') {
-            draggingIdx = Array.from(svg.children).indexOf(target);
+            draggingIdx = Array.from(svg.children).indexOf(target.parentElement);
             e.preventDefault();
         }
     });
