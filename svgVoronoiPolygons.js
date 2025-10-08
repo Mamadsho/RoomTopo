@@ -130,7 +130,8 @@ export function polygonsIntersection(a_i, b_i){
     // Ensure clip polygon is CCW so "inside" is consistently left-of-edge
     if (polygonArea(clip) < 0) clip = clip.slice().reverse();
 
-    const eps = 1e-12;
+    // Use same tolerance as cutPolygon to avoid flip-flopping
+    const eps = 1e-9;
 
     const inside = (pt, a, b) => {
         const ab = [b[0] - a[0], b[1] - a[1]];
@@ -166,12 +167,42 @@ export function polygonsIntersection(a_i, b_i){
         }
     }
 
+    // Remove consecutive duplicates and near-colinear vertices to stabilize results
+    const cleaned = [];
+    const nearEq = (p, q) => Math.abs(p[0]-q[0]) <= eps && Math.abs(p[1]-q[1]) <= eps;
+    const isColinear = (a, b, c) => {
+        const ab = [b[0]-a[0], b[1]-a[1]];
+        const bc = [c[0]-b[0], c[1]-b[1]];
+        return Math.abs(det(ab, bc)) <= eps;
+    };
+    for (let i = 0; i < output.length; i++) {
+        const pt = output[i];
+        if (cleaned.length === 0 || !nearEq(cleaned[cleaned.length-1], pt)) {
+            cleaned.push(pt);
+        }
+    }
+    // Remove colinear middle points
+    let changed = true;
+    while (changed && cleaned.length > 2) {
+        changed = false;
+        for (let i = 0; i < cleaned.length; i++) {
+            const a = cleaned[(i-1+cleaned.length)%cleaned.length];
+            const b = cleaned[i];
+            const c = cleaned[(i+1)%cleaned.length];
+            if (isColinear(a, b, c)) {
+                cleaned.splice(i,1);
+                changed = true;
+                break;
+            }
+        }
+    }
+
     // Return updated SVG polygon element when provided, to match call site
     if (b_i && b_i.pts !== undefined) {
-        b_i.pts = output;
+        b_i.pts = cleaned;
         return b_i;
     }
-    return output;
+    return cleaned;
 }
 
 // polygonArea moved to utils.js
@@ -244,13 +275,15 @@ export function updateVoronoi(sites, bbox, clippingPolygon) {
             vor_graph.children[i].pts = pol;
         }
     }
-    for (let i = sites.length - 1; i > 0; i--){
+    // Update all dirty polygons (including index 0) and reset flags
+    for (let i = sites.length - 1; i >= 0; i--){
         if (vor_graph.children[i].dirty) {
             if (vor_graph.children[i].pts == null){
                 vor_graph.children[i].remove();
             } else {
                 updatePolygon(polygonsIntersection(clippingPolygon, vor_graph.children[i]));
             }
+            vor_graph.children[i].dirty = false;
         }
     }
 }
