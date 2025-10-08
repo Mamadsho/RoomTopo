@@ -1,4 +1,4 @@
-import { distancesq, dot, det, arePointsOnSameSideOfLine } from "./utils.js";
+import { dot, det, arePointsOnSameSideOfLine, findIntersection, pointInPolygon, polygonArea } from "./utils.js";
 
 let vor_graph;
 let links_graph;
@@ -63,45 +63,9 @@ export function updateDot(d){
     d.setAttribute('cy', -d.c[1]);
 }
 
-export function isIntersecting(l1, l2){
-    const a = [ [l1[1][0] - l1[0][0]],
-                [l1[1][1] - l1[0][1]] ];
-    const nor = [a[1], -a[0]];
-    const b = [ [l2[0][0] - l1[0][0]],
-                [l2[0][1] - l1[0][1]]];
-    const c = [ [l2[1][0] - l1[0][0]],
-                [l2[1][1] - l1[0][1]]];
-    return dot(nor, b) * dot (nor, c) <= 0;
-}
+// Note: segment intersection helper removed; not used after simplification
 
-export function findIntersection(cs1, ls2){
-    const c = [ cs1[1][0] - cs1[0][0],
-                cs1[1][1] - cs1[0][1]];
-
-    const l = [ ls2[1][0] - ls2[0][0],
-                ls2[1][1] - ls2[0][1]];
-    
-    const o = [ cs1[0][0] - ls2[0][0],
-                cs1[0][1] - ls2[0][1]];
-    
-    // k1 * c - k2 * l = o
-    // by Cramer's Rule
-    // k2 = det(c, o)/det(c, -l);
-
-    const k2 = det(c, o)/det(c, l);
-    const iv = [k2 * l[0], k2 * l[1]];
-    const ip = [iv[0] + ls2[0][0], iv[1] + ls2[0][1]];
-    return ip;
-}
-
-export function bisectPolygon(polygon, line){
-    const res = cutPolygon(polygon.pts, line.segment);
-    if (res){
-        addPolygon(res[0], "red");
-        addPolygon(res[1], "blue");
-    }
-    return res;
-}
+// findIntersection moved to utils.js
 
 export function cutPolygon(pts, line, eps = 1e-9) {
     const n = pts.length;
@@ -156,91 +120,61 @@ export function cutPolygon(pts, line, eps = 1e-9) {
     return [P1, P2];
 }
 
-export function pointInPolygon(pt, pol) {
-    let inside = false;
-    const n = pol.length;
-    for (let i = 0, j = n - 1; i < n; j = i++) {
-        const xi = pol[i][0], yi = pol[i][1];
-        const xj = pol[j][0], yj = pol[j][1];
-        const intersect = ((yi > pt[1]) !== (yj > pt[1])) &&
-                            (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-    }
-    return inside;
-}
+// pointInPolygon moved to utils.js
 
 export function polygonsIntersection(a_i, b_i){
-    let a = (polygonArea(a_i) < 0)? Array.from(a_i) : Array.from(a_i).reverse();
-    let b = (polygonArea(b_i) < 0)? Array.from(b_i.pts) : Array.from(b_i.pts).reverse();
+    // Accept either raw point arrays or SVG polygon elements with `.pts`
+    let clip = Array.isArray(a_i) ? Array.from(a_i) : Array.from(a_i.pts);
+    let subj = Array.isArray(b_i) ? Array.from(b_i) : Array.from(b_i.pts);
 
-    class Point{
-        constructor(p){
-            this.p = p;
-            this.next = null;
-            this.insideA = false;
+    // Ensure clip polygon is CCW so "inside" is consistently left-of-edge
+    if (polygonArea(clip) < 0) clip = clip.slice().reverse();
+
+    const eps = 1e-12;
+
+    const inside = (pt, a, b) => {
+        const ab = [b[0] - a[0], b[1] - a[1]];
+        const ap = [pt[0] - a[0], pt[1] - a[1]];
+        return det(ab, ap) >= -eps;
+    };
+
+
+    let output = subj;
+    for (let i = 0; i < clip.length; i++) {
+        const a = clip[i];
+        const b = clip[(i + 1) % clip.length];
+
+        const input = output;
+        output = [];
+        if (input.length === 0) break;
+
+        let S = input[input.length - 1];
+        for (const E of input) {
+            const Ein = inside(E, a, b);
+            const Sin = inside(S, a, b);
+            if (Ein) {
+                if (!Sin) {
+                    const I = findIntersection([S, E], [a, b]);
+                    if (I) output.push(I);
+                }
+                output.push(E);
+            } else if (Sin) {
+                const I = findIntersection([S, E], [a, b]);
+                if (I) output.push(I);
+            }
+            S = E;
         }
     }
 
-    a.forEach((p, i)=>{
-        a[i] = new Point(p);
-        // a[i].next = a[(i + 1) % a.length];
-    });
-    a.forEach((p,i)=>{
-        a[i].next = a[(i + 1) % a.length];
-    })
-    b.forEach((p, i)=>{
-        b[i] = new Point(p);
-        // b[i].next = b[(i + 1) % b.length];
-        b[i].insideA = pointInPolygon(b[i].p, a);
-    });
-    b.forEach((p,i)=>{
-        b[i].next = b[(i + 1) % b.length];
-    })
-
-    // Find intersection points and insert them into the polygon linked lists
-    // Generate list of inbound intersection points
-    let inbound = [];
-    let p_next, q_next;
-    let p = a[0];
-    do {
-        p_next = p.next;
-        let q = b[0];
-        do {
-            q_next = q.next;
-            if (isIntersecting([p.p, p.next.p], [q.p, q.next.p])){
-                const ip_a = new Point(findIntersection([p.p, p.next.p], [q.p, q.next.p]));
-                const ip_b = new Point(ip_a.p);
-                p.next = ip_a;
-                q.next = ip_b;
-                ip_a.next = q.next;
-                ip_b.next = p.next;
-                if (ip_a.next.insideA){
-                    inbound.push(ip_a);
-                }
-            }
-        } while ((q = q_next) !== b[0]);
-    } while ((p = p_next) !== a[0]);
-
-    i_pol = [];
-    p = inbound[0];
-    do {
-        i_pol.push(p.p);
-        p = p.next;
-    } while (p != inbound[0]);
-
-    return i_pol;
-}
-
-export function polygonArea(pts){
-    let area = 0;
-    const n = pts.length;
-    for (let i = 0; i < n; i++){
-        const j = (i + 1) % n;
-        area += pts[i][0] * pts[j][1];
-        area -= pts[j][0] * pts[i][1];
+    // Return updated SVG polygon element when provided, to match call site
+    if (b_i && b_i.pts !== undefined) {
+        b_i.pts = output;
+        return b_i;
     }
-    return area / 2;
+    return output;
 }
+
+// polygonArea moved to utils.js
 
 export function midline(p1, p2){
     const normal = [p2[1] - p1[1], p1[0] - p2[0]];
