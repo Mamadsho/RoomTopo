@@ -17,11 +17,23 @@ button, input[type="text"] {
 select{
     width: 130px;
 }
-
 .room, .link {
     display: flex;
     margin-bottom: 5px;
     align-items: center;
+}
+
+/* SVG styling */
+#voronoi-centroids-svg,
+#voronoi-polygons,
+#links-lines,
+#debug-graph {
+    position: absolute;
+    left: 0;
+    top: 0;
+    fill: none;
+    stroke: white;
+    stroke-width: 0.02;
 }
 
 .centroid {
@@ -33,12 +45,13 @@ select{
 
 .label{
     fill: white;
+    stroke: none;
     text-anchor: middle;
     font-size: 0.12;
     font-family: monospace;
     pointer-events: none;
     user-select: none;
-    transform: translateY(-0.15px);
+    transform: translateY(-0.1px);
 }
 
 #links-lines line{

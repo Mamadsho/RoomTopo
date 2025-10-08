@@ -1,10 +1,14 @@
+import { distancesq, dot, det, arePointsOnSameSideOfLine } from "./utils.js";
+
 let vor_graph;
 let links_graph;
+let debug_graph;
 
 export function init(canvas){
-    vor_graph = document.querySelector("#vorinoi-polygons");
+    vor_graph = document.querySelector("#voronoi-polygons");
     links_graph = document.querySelector("#links-lines");
-    [vor_graph, links_graph].forEach((g)=>{
+    debug_graph = document.querySelector("#debug-graph");
+    [vor_graph, links_graph, debug_graph].forEach((g)=>{
         g.setAttribute("width", canvas.width);
         g.setAttribute("height", canvas.height);
     });
@@ -44,9 +48,10 @@ export function updatePolygon(polygon){
     polygon.setAttribute('points', attr);
 }
 
-export function addDot(center, container=vor_graph){
+export function addDot(center, stroke, container=vor_graph){
     const d = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     d.c = center;
+    if (stroke) d.setAttribute('stroke', stroke);
     d.setAttribute('r', 0.02);
     updateDot(d);
     container.appendChild(d);
@@ -143,25 +148,87 @@ export function cutPolygon(pts, line, eps = 1e-9) {
         ...pts.slice(i1 + 1, n)
     ];
     const P2 = [
-        C0,
         ...pts.slice(i0 + 1, i1 + 1),
-        C1
+        C1,
+        C0
     ];
 
     return [P1, P2];
 }
 
-export function pointInPolygon(pt, polygon) {
+export function pointInPolygon(pt, pol) {
     let inside = false;
-    const n = polygon.length;
+    const n = pol.length;
     for (let i = 0, j = n - 1; i < n; j = i++) {
-        const xi = polygon[i][0], yi = polygon[i][1];
-        const xj = polygon[j][0], yj = polygon[j][1];
+        const xi = pol[i][0], yi = pol[i][1];
+        const xj = pol[j][0], yj = pol[j][1];
         const intersect = ((yi > pt[1]) !== (yj > pt[1])) &&
                             (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi);
         if (intersect) inside = !inside;
     }
     return inside;
+}
+
+export function polygonsIntersection(a_i, b_i){
+    let a = (polygonArea(a_i) < 0)? Array.from(a_i) : Array.from(a_i).reverse();
+    let b = (polygonArea(b_i) < 0)? Array.from(b_i.pts) : Array.from(b_i.pts).reverse();
+
+    class Point{
+        constructor(p){
+            this.p = p;
+            this.next = null;
+            this.insideA = false;
+        }
+    }
+
+    a.forEach((p, i)=>{
+        a[i] = new Point(p);
+        // a[i].next = a[(i + 1) % a.length];
+    });
+    a.forEach((p,i)=>{
+        a[i].next = a[(i + 1) % a.length];
+    })
+    b.forEach((p, i)=>{
+        b[i] = new Point(p);
+        // b[i].next = b[(i + 1) % b.length];
+        b[i].insideA = pointInPolygon(b[i].p, a);
+    });
+    b.forEach((p,i)=>{
+        b[i].next = b[(i + 1) % b.length];
+    })
+
+    // Find intersection points and insert them into the polygon linked lists
+    // Generate list of inbound intersection points
+    let inbound = [];
+    let p_next, q_next;
+    let p = a[0];
+    do {
+        p_next = p.next;
+        let q = b[0];
+        do {
+            q_next = q.next;
+            if (isIntersecting([p.p, p.next.p], [q.p, q.next.p])){
+                const ip_a = new Point(findIntersection([p.p, p.next.p], [q.p, q.next.p]));
+                const ip_b = new Point(ip_a.p);
+                p.next = ip_a;
+                q.next = ip_b;
+                ip_a.next = q.next;
+                ip_b.next = p.next;
+                if (ip_a.next.insideA){
+                    inbound.push(ip_a);
+                }
+            }
+        } while ((q = q_next) !== b[0]);
+    } while ((p = p_next) !== a[0]);
+
+    i_pol = [];
+    p = inbound[0];
+    do {
+        i_pol.push(p.p);
+        p = p.next;
+    } while (p != inbound[0]);
+
+    return i_pol;
 }
 
 export function polygonArea(pts){
@@ -181,19 +248,12 @@ export function midline(p1, p2){
     return [ [mid[0] - normal[0], mid[1] - normal[1]],
              [mid[0] + normal[0], mid[1] + normal[1]] ];
 }
-function dot (a, b){
-    return a[0] * b[0] + a[1] * b[1];
-}
-
-function det (a, b){
-    return a[0] * b[1] - a[1] * b[0];
-}
 
 export function generateVoronoi(sites, bbox) {
     for (let i = 0; i < sites.length; i++) {
         // addDot(sites[i]);
         let pol = bbox;
-        let vpol = addPolygon(pol, "lightgrey");
+        let vpol = addPolygon(pol);
         for (let j = 0; j < sites.length; j++) {
             if (i !== j) {
                 const mid = midline(sites[i], sites[j]);
@@ -210,34 +270,53 @@ export function generateVoronoi(sites, bbox) {
     }
 }
 
-export function updateVoronoi(sites, bbox) {
+export function updateVoronoi(sites, bbox, clippingPolygon) {
     while (vor_graph.children.length > sites.length) {
         vor_graph.removeChild(vor_graph.lastChild);
     }
     // Add new dots and polygons
     for (let i = 0; i < sites.length; i++) {
         if (i >= vor_graph.children.length) {
-            addPolygon(bbox, "lightgrey");
+            addPolygon(bbox);
         }
     }
 
     // Update existing dots and polygons
     // if it has changed
-    for (let i = 0; i < sites.length; i++) {
+    outerLoop: for (let i = 0; i < sites.length; i++) {
         let pol = bbox;
         for (let j = 0; j < sites.length; j++) {
             if (i !== j) {
                 const mid = midline(sites[i], sites[j]);
-                const cut_pol = cutPolygon(pol, mid);
-                if (cut_pol) {
-                    if (pointInPolygon(sites[i], cut_pol[0])) { pol = cut_pol[0]; }
-                    else { pol = cut_pol[1]; }
+                const cut_pols = cutPolygon(pol, mid);
+                if (cut_pols) {
+
+                    if ( arePointsOnSameSideOfLine(sites[i], cut_pols[0][0], mid) ){
+                        pol = cut_pols[0];
+                    } else { 
+                        pol = cut_pols[1];
+                    }
+                } else {
+                    if ( !arePointsOnSameSideOfLine(sites[i], pol[0], mid) ){
+                        vor_graph.children[i].dirty = true;
+                        vor_graph.children[i].pts = null;
+                        continue outerLoop;
+                    }
                 }
             }
         }
-        if (pol !== vor_graph.children[i].pts) {
+        if (vor_graph.children[i].pts != pol){
+            vor_graph.children[i].dirty = true;
             vor_graph.children[i].pts = pol;
-            updatePolygon(vor_graph.children[i]);
+        }
+    }
+    for (let i = sites.length - 1; i > 0; i--){
+        if (vor_graph.children[i].dirty) {
+            if (vor_graph.children[i].pts == null){
+                vor_graph.children[i].remove();
+            } else {
+                updatePolygon(polygonsIntersection(clippingPolygon, vor_graph.children[i]));
+            }
         }
     }
 }

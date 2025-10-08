@@ -18,7 +18,7 @@ gl.init(canvas);
 sc.initSVG(canvas, sites, ()=>{
     gl.update(sites, colors);
     Link.updateAll();
-    sp.updateVoronoi(sites, Room.boundingPolygon);
+    sp.updateVoronoi(sites, Room.boundingPolygon, Room.clipPolygon);
 });
 sp.init(canvas);
 
@@ -26,7 +26,8 @@ class Room{
     static rooms = [];
     static count = 0;
     static maxId = 0;
-    static boundingPolygon = [[-.35, -.95], [.95, -.95], [.35, .95], [-.95, .95]];
+    static boundingPolygon = [[-.95, -.95], [.95, -.95], [.95, .95], [-.95, .95]];
+    static clipPolygon = [[-.35, -.45], [.95, -.95], [.45, .95], [-.95, .95]];
     idx;
     name;
     svg;
@@ -44,7 +45,7 @@ class Room{
 
         this.svg = sc.addRoom(name, 0, 0);
         gl.update(sites, colors);
-        sp.updateVoronoi(sites, Room.boundingPolygon);
+        sp.updateVoronoi(sites, Room.boundingPolygon, Room.clipPolygon);
 
         this.dom.nameInput.addEventListener('input',()=>{
             this.name = this.dom.nameInput.value;
