@@ -23,6 +23,10 @@ select{
     align-items: center;
 }
 
+#canvas-container {
+    position: relative;
+    margin-bottom: 20px;
+}
 /* SVG styling */
 #voronoi-centroids-svg,
 #voronoi-polygons,

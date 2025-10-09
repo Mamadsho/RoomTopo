@@ -2,42 +2,25 @@ let svg;
 let width;
 let height;
 import {clamp} from './utils.js'
+import { Renderer } from './svgRenderer.js';
 
-export function initSVG(canvas, sites, onUpdate) {
-    svg = document.getElementById('voronoi-centroids-svg');
+let R /** @type {Renderer} */;
+
+export function initSVG(canvas, sites, onUpdate, renderer) {
+    R = renderer;
+    svg = R.getCentroidsLayer();
     width = canvas.width;
     height = canvas.height;
-
-    // Create SVG element
-    svg.setAttribute('width', width);
-    svg.setAttribute('height', height);
-
-    // Position SVG above canvas
-    canvas.parentElement.style.position = 'relative';
-    canvas.parentElement.appendChild(svg);
-
-    // enableSiteDragging(canvas, sites, svg.onUpdate);
     enableSiteDragging(canvas, sites, onUpdate);
-
     return svg;
 }
 
 export function addRoom(name, cx, cy) {
-    const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    circle.setAttribute('class', 'centroid');
-    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-    label.setAttribute('class', 'label');
-    label.textContent = name;
-    group.appendChild(circle);
-    group.appendChild(label);
-    svg.appendChild(group);
-    return group;
+    return R.addCentroidGroup(name, cx, cy);
 }
 
 export function updateRoomLabel(room, name){
-    const label = room.querySelector('text');
-    label.textContent = name;
+    R.updateCentroidLabel(room, name);
 }
 
 export function removeRoom(idx){
@@ -68,8 +51,8 @@ function enableSiteDragging(canvas, sites, onUpdate) {
         sites[draggingIdx][1] = -y;
 
         // Move the SVG dot group only
-        const circle = svg.children[draggingIdx];
-        circle.setAttribute('transform', `translate(${x}, ${y})`);
+        const group = svg.children[draggingIdx];
+        R.updateCentroidTransform(group, x, y);
 
         if (onUpdate) onUpdate();
     }

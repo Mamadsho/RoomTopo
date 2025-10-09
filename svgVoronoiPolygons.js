@@ -1,71 +1,23 @@
 import { dot, det, arePointsOnSameSideOfLine, findIntersection, pointInPolygon, polygonArea } from "./utils.js";
+import { Renderer } from "./svgRenderer.js";
 
-let vor_graph;
-let links_graph;
-let debug_graph;
+let R /** @type {Renderer} */;
 
-export function init(canvas){
-    vor_graph = document.querySelector("#voronoi-polygons");
-    links_graph = document.querySelector("#links-lines");
-    debug_graph = document.querySelector("#debug-graph");
-    [vor_graph, links_graph, debug_graph].forEach((g)=>{
-        g.setAttribute("width", canvas.width);
-        g.setAttribute("height", canvas.height);
-    });
+export function init(canvas, renderer){
+    R = renderer;
+    if (canvas && R && R.syncCanvasSize) R.syncCanvasSize(canvas);
 }
 
 
-export function addLine(p1, p2, stroke=null, container=links_graph){
-    const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    l.segment = [p1, p2];
-    if (stroke) l.setAttribute('stroke', stroke);
-    updateLine(l);
-    container.appendChild(l);
-    return l;
-}
+export function addLine(p1, p2, stroke=null, container){ return R.addLine(p1, p2, stroke, container); }
+export function updateLine(l){ return R.updateLine(l); }
 
-export function updateLine(l){
-    l.setAttribute("x1", l.segment[0][0]);
-    l.setAttribute("y1", -l.segment[0][1]);
-    l.setAttribute("x2", l.segment[1][0]);
-    l.setAttribute("y2", -l.segment[1][1]);
-}
+export function addPolygon(pts, stroke=null, container){ return R.addPolygon(pts, stroke, container || R.getVorLayer()); }
+export function updatePolygon(polygon){ return R.updatePolygon(polygon); }
 
-export function addPolygon(pts, stroke=null, container=vor_graph){
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-    p.pts = pts;
-    if (stroke) p.setAttribute('stroke', stroke);
-    updatePolygon(p);
-    container.appendChild(p);
-    return p;
-}
+export function addDot(center, stroke, container){ return R.addDot(center, stroke, container || R.getVorLayer()); }
+export function updateDot(d){ return R.updateDot(d); }
 
-export function updatePolygon(polygon){
-    let attr = "";
-    polygon.pts.forEach((p)=>{
-        attr += p[0] + "," + -p[1] + " ";
-    });
-    polygon.setAttribute('points', attr);
-}
-
-export function addDot(center, stroke, container=vor_graph){
-    const d = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    d.c = center;
-    if (stroke) d.setAttribute('stroke', stroke);
-    d.setAttribute('r', 0.02);
-    updateDot(d);
-    container.appendChild(d);
-    return d
-}
-
-export function updateDot(d){
-    d.setAttribute('cx', d.c[0]);
-    d.setAttribute('cy', -d.c[1]);
-}
-
-// Note: segment intersection helper removed; not used after simplification
-
-// findIntersection moved to utils.js
 
 export function cutPolygon(pts, line, eps = 1e-9) {
     const n = pts.length;
@@ -214,34 +166,24 @@ export function midline(p1, p2){
              [mid[0] + normal[0], mid[1] + normal[1]] ];
 }
 
-export function generateVoronoi(sites, bbox) {
-    for (let i = 0; i < sites.length; i++) {
-        // addDot(sites[i]);
-        let pol = bbox;
-        let vpol = addPolygon(pol);
-        for (let j = 0; j < sites.length; j++) {
-            if (i !== j) {
-                const mid = midline(sites[i], sites[j]);
-                const cut_pol = cutPolygon(pol, mid);
-                if (cut_pol) {
-                    if (pointInPolygon(sites[i], cut_pol[0])) { pol = cut_pol[0]; }
-                    else { pol = cut_pol[1]; }
-                    vpol.pts = pol;
-                    // updatePolygon(vpol);
-                }
-            }
-        }
-        updatePolygon(vpol);
+// Approximate equality for polygon point arrays
+function approxEqualPts(a, b, eps = 1e-9){
+    if (a === b) return true;
+    if (!a || !b) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++){
+        if (Math.abs(a[i][0] - b[i][0]) > eps || Math.abs(a[i][1] - b[i][1]) > eps) return false;
     }
+    return true;
 }
 
 export function updateVoronoi(sites, bbox, clippingPolygon) {
-    while (vor_graph.children.length > sites.length) {
-        vor_graph.removeChild(vor_graph.lastChild);
+    while (R.getVorLayer().children.length > sites.length) {
+        R.getVorLayer().removeChild(R.getVorLayer().lastChild);
     }
     // Add new dots and polygons
     for (let i = 0; i < sites.length; i++) {
-        if (i >= vor_graph.children.length) {
+        if (i >= R.getVorLayer().children.length) {
             addPolygon(bbox);
         }
     }
@@ -263,27 +205,39 @@ export function updateVoronoi(sites, bbox, clippingPolygon) {
                     }
                 } else {
                     if ( !arePointsOnSameSideOfLine(sites[i], pol[0], mid) ){
-                        vor_graph.children[i].dirty = true;
-                        vor_graph.children[i].pts = null;
+                        const child = R.getVorLayer().children[i];
+                        if (child.pts !== null){
+                            child.dirty = true;
+                            child.pts = null;
+                        }
                         continue outerLoop;
                     }
                 }
             }
         }
-        if (vor_graph.children[i].pts != pol){
-            vor_graph.children[i].dirty = true;
-            vor_graph.children[i].pts = pol;
+        // Clip now so .pts stores the final polygon
+        let clipped = polygonsIntersection(clippingPolygon, pol) || [];
+        if (clipped && clipped.pts) clipped = clipped.pts; // normalize to array
+        const finalPts = (clipped.length >= 3) ? clipped : null;
+        const child = R.getVorLayer().children[i];
+        if (!approxEqualPts(child.pts, finalPts)){
+            child.dirty = true;
+            child.pts = finalPts;
         }
     }
     // Update all dirty polygons (including index 0) and reset flags
     for (let i = sites.length - 1; i >= 0; i--){
-        if (vor_graph.children[i].dirty) {
-            if (vor_graph.children[i].pts == null){
-                vor_graph.children[i].remove();
+        const child = R.getVorLayer().children[i];
+        if (!child) continue;
+        if (child.dirty) {
+            if (child.pts == null){
+                child.remove();
+                continue;
             } else {
-                updatePolygon(polygonsIntersection(clippingPolygon, vor_graph.children[i]));
+                // Already clipped; just push to DOM
+                updatePolygon(child);
+                child.dirty = false;
             }
-            vor_graph.children[i].dirty = false;
         }
     }
 }

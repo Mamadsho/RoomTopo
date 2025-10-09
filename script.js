@@ -3,6 +3,7 @@ import * as sc from './svgVoronoiCentroids.js';
 import * as ht from './htmlVoronoi.js';
 import * as sp from './svgVoronoiPolygons.js';
 import { hexToRgb } from './utils.js';
+import { Renderer } from './svgRenderer.js';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -13,14 +14,22 @@ const colors = [];
 const canvas = document.getElementById('canvas');
 const svg = document.getElementById('voronoi-centroids-svg');
 const rooms_container = document.getElementById('rooms-container');
-// Initialize Voronoi rendering
+
+// Initialize renderer and Voronoi rendering
+const renderer = new Renderer({
+    vor: '#voronoi-polygons',
+    links: '#links-lines',
+    centroids: '#voronoi-centroids-svg',
+    debug: '#debug-graph'
+});
 gl.init(canvas);
+renderer.syncCanvasSize(canvas);
 sc.initSVG(canvas, sites, ()=>{
     gl.update(sites, colors);
     Link.updateAll();
     sp.updateVoronoi(sites, Room.boundingPolygon, Room.clipPolygon);
-});
-sp.init(canvas);
+}, renderer);
+sp.init(canvas, renderer);
 
 class Room{
     static rooms = [];
